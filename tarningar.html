@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tärningar</title>
+<style>
+:root{
+  --text:#2b2a27;--text-secondary:#6b6860;--page:#faf9f6;--border:#c9c6bd;--border-hover:#8f8b80;
+  --btn:#fff;--on-bg:#e6f1fb;--on-border:#378add;--on-text:#0c447c;
+  box-sizing:border-box;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --text:#ecebe6;--text-secondary:#a3a098;--page:#1c1b19;--border:#4a4843;--border-hover:#7a776f;
+    --btn:#2a2926;--on-bg:#0c2f52;--on-border:#5aa2e6;--on-text:#b5d4f4;
+  }
+}
+:root[data-theme="dark"]{
+  --text:#ecebe6;--text-secondary:#a3a098;--page:#1c1b19;--border:#4a4843;--border-hover:#7a776f;
+  --btn:#2a2926;--on-bg:#0c2f52;--on-border:#5aa2e6;--on-text:#b5d4f4;
+}
+*,*::before,*::after{box-sizing:inherit}
+html,body{margin:0}
+body{background:var(--page);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;min-height:100vh;display:flex;justify-content:center;padding:24px 16px}
+main{width:100%;max-width:680px}
+h1{font-size:15px;font-weight:500;margin:0 0 16px;text-align:center;color:var(--text-secondary)}
+button{font:inherit;font-size:14px;color:var(--text);background:var(--btn);border:1px solid var(--border);border-radius:8px;padding:8px 14px;cursor:pointer}
+button:hover{border-color:var(--border-hover)}
+button:active{transform:scale(.97)}
+button:focus-visible{outline:2px solid var(--on-border);outline-offset:2px}
+button:disabled{opacity:.5;cursor:default}
+.opt{min-width:44px}
+.opt.on{border:2px solid var(--on-border);background:var(--on-bg);color:var(--on-text)}
+.row{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 0 .5rem;flex-wrap:wrap}
+.lbl{font-size:14px;color:var(--text-secondary);margin-right:4px}
+#stage{min-height:300px;display:flex;align-items:center;justify-content:center;gap:40px;perspective:900px;cursor:pointer;flex-wrap:wrap}
+.tilt{width:160px;height:160px;position:relative;transform-style:preserve-3d}
+.cube{position:absolute;left:50%;top:50%;width:0;height:0;transform-style:preserve-3d;transition:transform var(--dur,1400ms) cubic-bezier(.15,.7,.2,1)}
+.face{position:absolute;left:-65px;top:-65px;width:130px;height:130px;background:var(--bg);border:6px solid var(--ink);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:78px;font-weight:500;color:#fff;line-height:1;user-select:none}
+.facep{position:absolute;left:0;top:0;width:200px;height:200px;transform-origin:0 0;backface-visibility:hidden}
+.facep svg{display:block;overflow:visible}
+.c0{--bg:#993C1D;--ink:#4A1B0C}
+.c1{--bg:#0F6E56;--ink:#04342C}
+.c2{--bg:#534AB7;--ink:#26215C}
+.f1{transform:translateZ(65px)}
+.f6{transform:rotateY(180deg) translateZ(65px)}
+.f3{transform:rotateY(90deg) translateZ(65px)}
+.f4{transform:rotateY(-90deg) translateZ(65px)}
+.f2{transform:rotateX(90deg) translateZ(65px)}
+.f5{transform:rotateX(-90deg) translateZ(65px)}
+.result{text-align:center;margin:0 0 1rem}
+#out{font-size:22px;font-weight:500;margin:0 0 12px}
+.histrow{display:flex;align-items:center;justify-content:center;gap:10px;margin:12px 0 0;min-height:30px}
+#hist{font-size:13px;color:var(--text-secondary)}
+#clr{padding:4px 10px;font-size:13px;display:none}
+</style>
+</head>
+<body>
+<main>
+  <h1>Tärningar</h1>
+  <div class="row">
+    <span class="lbl">Typ</span>
+    <button class="opt typ" data-t="4">Fyrsidiga</button>
+    <button class="opt typ on" data-t="6">Sexsidiga</button>
+    <button class="opt typ" data-t="10">Tiosidiga</button>
+  </div>
+  <div class="row">
+    <span class="lbl">Antal</span>
+    <button class="opt cnt on" data-n="1">1</button>
+    <button class="opt cnt" data-n="2">2</button>
+    <button class="opt cnt" data-n="3">3</button>
+  </div>
+  <div id="stage" aria-label="Tärningar, klicka för att slå"></div>
+  <div class="result">
+    <p id="out" aria-live="polite">Slå tärningen!</p>
+    <button id="btn">Slå</button>
+    <div class="histrow">
+      <span id="hist"></span>
+      <button id="clr" aria-label="Nollställ senaste slag">Nollställ</button>
+    </div>
+  </div>
+</main>
+<script>
+const stage=document.getElementById('stage'),out=document.getElementById('out'),btn=document.getElementById('btn'),histEl=document.getElementById('hist'),clr=document.getElementById('clr');
+const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const DUR=reduce?150:1400;
+document.documentElement.style.setProperty('--dur',DUR+'ms');
+const target6={1:[0,0],6:[0,180],3:[0,-90],4:[0,90],2:[-90,0],5:[90,0]};
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const norm=a=>{const l=Math.hypot(a[0],a[1],a[2]);return a.map(x=>x/l)};
+const f4=x=>x.toFixed(4);
+function pack(store,num,c,n,e1,e2,v,ty){
+  const o=[0,1,2].map(k=>c[k]-100*e1[k]-100*e2[k]);
+  store[num]={
+    css:'matrix3d('+[...e1,0,...e2,0,...n,0,...o,1].map(f4).join(',')+')',
+    rot:'matrix3d('+[e1[0],e2[0],n[0],0,e1[1],e2[1],n[1],0,e1[2],e2[2],n[2],0,0,0,0,1].map(f4).join(',')+')',
+    dy:-dot(c,e2),
+    pts:v.map(p=>{const d=sub(p,c);return f4(100+dot(d,e1))+','+f4(100+dot(d,e2))}).join(' '),
+    ty
+  };
+}
+/* Tiosidig: tio drakformade sidor, internt 1–10 (visas som 0–9) */
+const H=78,c36=Math.cos(Math.PI/5),h=H*(1-c36)/(1+c36),R=72;
+const T=[0,-H,0],B=[0,H,0];
+const U=i=>{const a=2*((i%5+5)%5)*Math.PI/5;return[R*Math.cos(a),-h,R*Math.sin(a)]};
+const L=i=>{const a=(2*((i%5+5)%5)+1)*Math.PI/5;return[R*Math.cos(a),h,R*Math.sin(a)]};
+const upperNum=[1,3,5,7,9];
+const faces10={};
+function makeKite(v,upper,num){
+  const c=[0,1,2].map(k=>(v[0][k]+v[1][k]+v[2][k]+v[3][k])/4);
+  let n=norm(cross(sub(v[1],v[0]),sub(v[3],v[0])));
+  if(dot(n,c)<0)n=n.map(x=>-x);
+  const e2=upper?norm(sub(v[2],v[0])):norm(sub(v[0],v[2]));
+  const e1=cross(e2,n);
+  const fm=[0,1,2].map(k=>(v[1][k]+v[3][k])/2);
+  pack(faces10,num,c,n,e1,e2,v,100+0.5*dot(sub(fm,c),e2));
+}
+for(let i=0;i<5;i++){
+  makeKite([T,U(i),L(i),U(i+1)],true,upperNum[i]);
+  makeKite([B,L(i),U(i+1),L(i+1)],false,11-upperNum[(i+3)%5]);
+}
+/* Fyrsidig: tetraeder med fyra trianglar */
+const rho=95,rr=rho*Math.sqrt(8)/3;
+const V0=[0,-rho,0];
+const Vk=k=>{const a=(90+120*((k%3+3)%3))*Math.PI/180;return[rr*Math.cos(a),rho/3,rr*Math.sin(a)]};
+const faces4={};
+function makeTri(v,num){
+  const c=[0,1,2].map(k=>(v[0][k]+v[1][k]+v[2][k])/3);
+  let n=norm(cross(sub(v[1],v[0]),sub(v[2],v[0])));
+  if(dot(n,c)<0)n=n.map(x=>-x);
+  const mid=[0,1,2].map(k=>(v[1][k]+v[2][k])/2);
+  const e2=norm(sub(mid,v[0]));
+  const e1=cross(e2,n);
+  pack(faces4,num,c,n,e1,e2,v,100);
+}
+makeTri([Vk(0),Vk(1),Vk(2)],1);
+for(let k=0;k<3;k++)makeTri([V0,Vk(k),Vk(k+1)],k+2);
+const poly={4:{faces:faces4,n:4,fs:46,label:k=>k,val:n=>n},10:{faces:faces10,n:10,fs:46,label:k=>k-1,val:n=>n-1}};
+let dice=[],rolling=false,hist=[],count=1,type=6;
+function d6Tf(ax,ay){return 'translate3d(0px,0px,0px) rotateX('+ax+'deg) rotateY('+ay+'deg)'}
+function polyTf(faces,ax,ay,num){const f=faces[num];return 'translate3d(0px,'+f4(f.dy)+'px,0px) rotateX('+ax+'deg) rotateY('+ay+'deg) '+f.rot}
+function showHist(){
+  histEl.textContent=hist.length?'Senaste slag: '+hist.join(' · '):'';
+  clr.style.display=hist.length?'inline-block':'none';
+}
+function build(n,t){
+  count=n;type=t;stage.innerHTML='';dice=[];
+  for(let i=0;i<n;i++){
+    const tilt=document.createElement('div');tilt.className='tilt';
+    const cube=document.createElement('div');cube.className='cube';
+    if(t===6){
+      for(let k=1;k<=6;k++){const f=document.createElement('div');f.className='face f'+k+' c'+i;f.textContent=k;cube.appendChild(f);}
+      cube.style.transform=d6Tf(0,0);
+    }else{
+      const P=poly[t];
+      for(let k=1;k<=P.n;k++){
+        const fd=P.faces[k];
+        const f=document.createElement('div');f.className='facep c'+i;f.style.transform=fd.css;
+        f.innerHTML='<svg width="200" height="200" viewBox="0 0 200 200"><polygon points="'+fd.pts+'" style="fill:var(--bg);stroke:var(--ink);stroke-width:6;stroke-linejoin:round"/><text x="100" y="'+f4(fd.ty)+'" text-anchor="middle" dominant-baseline="central" style="font-family:inherit;font-size:'+P.fs+'px;font-weight:500;fill:#fff">'+P.label(k)+'</text></svg>';
+        cube.appendChild(f);
+      }
+      cube.style.transform=polyTf(P.faces,0,0,1);
+    }
+    tilt.appendChild(cube);stage.appendChild(tilt);
+    dice.push({tilt,cube,ax:0,ay:0});
+  }
+  out.textContent=n===1?'Slå tärningen!':'Slå tärningarna!';
+  document.querySelectorAll('.cnt').forEach(b=>b.classList.toggle('on',+b.dataset.n===n));
+  document.querySelectorAll('.typ').forEach(b=>b.classList.toggle('on',+b.dataset.t===t));
+}
+function roll(){
+  if(rolling)return;
+  rolling=true;btn.disabled=true;out.textContent='Rullar…';
+  const res=[];
+  dice.forEach((d,i)=>{
+    const n=Math.floor(Math.random()*type)+1;
+    if(type===6){
+      res.push(n);
+      const [tx,ty]=target6[n];
+      d.ax=Math.ceil(d.ax/360)*360+720+tx;
+      d.ay=Math.ceil(d.ay/360)*360+1080+ty;
+      d.cube.style.transform=d6Tf(d.ax,d.ay);
+    }else{
+      const P=poly[type];
+      res.push(P.val(n));
+      d.ax=Math.ceil(d.ax/360)*360+720;
+      d.ay=Math.ceil(d.ay/360)*360+1080;
+      d.cube.style.transform=polyTf(P.faces,d.ax,d.ay,n);
+    }
+    if(!reduce){
+      const hh=-60+i*8;
+      d.tilt.animate([
+        {transform:'translateY(0) rotateX(0deg) rotateY(0deg)'},
+        {transform:'translateY('+hh+'px) rotateX(-24deg) rotateY(-30deg)',offset:.3},
+        {transform:'translateY(-20px) rotateX(-16deg) rotateY(-20deg)',offset:.65},
+        {transform:'translateY(0) rotateX(0deg) rotateY(0deg)'}
+      ],{duration:DUR,easing:'ease-out'});
+    }
+  });
+  setTimeout(()=>{
+    out.textContent=res.length===1?'Du slog '+res[0]+'!':'Du slog '+res.slice(0,-1).join(', ')+' och '+res[res.length-1];
+    hist.unshift(res.join(', '));
+    hist=hist.slice(0,6);
+    showHist();
+    rolling=false;btn.disabled=false;
+  },DUR+50);
+}
+document.querySelectorAll('.cnt').forEach(b=>b.addEventListener('click',()=>{if(!rolling&&+b.dataset.n!==count)build(+b.dataset.n,type);}));
+document.querySelectorAll('.typ').forEach(b=>b.addEventListener('click',()=>{if(!rolling&&+b.dataset.t!==type)build(count,+b.dataset.t);}));
+clr.addEventListener('click',()=>{if(rolling)return;hist=[];showHist();});
+btn.addEventListener('click',roll);
+stage.addEventListener('click',roll);
+build(1,6);
+showHist();
+</script>
+</body>
+</html>
